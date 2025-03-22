@@ -19,9 +19,3 @@ resource "azurerm_resource_group" "grupo_gcs_cp2" {
   name     = var.resource_group_name
   location = var.location
 }
-
-# Creacion grupo de Recursos
-resource "azurerm_resource_group" "rg" {
-  name     = var.resource_group_name
-  location = var.location
-}
