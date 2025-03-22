@@ -1,0 +1,66 @@
+- name: Subir imágenes a Azure Container Registry
+  hosts: localhost
+  become: true
+
+  vars:
+    acr_name: "acrgcscp2.azurecr.io"
+    acr_username: "acrgcscp2"
+    image_version: "Casopractico2"
+
+  vars_files:
+    - secrets.yml
+
+  tasks:
+    - name: Iniciar sesión en ACR
+      containers.podman.podman_login:
+        registry: "{{ acr_name }}"
+        username: "{{ acr_username }}"
+        password: "{{ acr_password }}"
+
+    - name: Descargar imagen de Nginx
+      containers.podman.podman_image:
+        name: "docker.io/nginx"
+
+    - name: Etiquetar imagen de Nginx
+      containers.podman.podman_tag:
+        image: "docker.io/nginx"
+        target_names:
+          - "{{ acr_name }}/nginx_gcs_cp2:{{ image_version }}"
+
+    - name: Subir imagen de Nginx a ACR
+      containers.podman.podman_image:
+        name: "{{ acr_name }}/nginx_gcs_cp2"
+        tag: "{{ image_version }}"
+        push: yes
+
+    - name: Descargar imagen de aplicación de votos (Frontend)
+      containers.podman.podman_image:
+        name: "docker.io/dockersamples/examplevotingapp_vote"
+
+    - name: Etiquetar imagen de votos
+      containers.podman.podman_tag:
+        image: "docker.io/dockersamples/examplevotingapp_vote"
+        target_names:
+          - "{{ acr_name }}/frontapp_gcs_cp2:{{ image_version }}"
+
+    - name: Subir imagen de votos a ACR
+      containers.podman.podman_image:
+        name: "{{ acr_name }}/frontapp_gcs_cp2"
+        tag: "{{ image_version }}"
+        push: yes
+
+    - name: Descargar imagen de Redis
+      containers.podman.podman_image:
+        name: "docker.io/redis"
+
+    - name: Etiquetar imagen de Redis
+      containers.podman.podman_tag:
+        image: "docker.io/redis"
+        target_names:
+          - "{{ acr_name }}/redis_gcs_cp2:{{ image_version }}"
+
+    - name: Subir imagen de Redis a ACR
+      containers.podman.podman_image:
+        name: "{{ acr_name }}/redis_gcs_cp2"
+        tag: "{{ image_version }}"
+        push: yes

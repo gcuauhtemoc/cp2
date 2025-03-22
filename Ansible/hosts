@@ -1,0 +1,5 @@
+[vm]
+myvm ansible_host=172.191.59.195 ansible_user=adminuser ansible_ssh_private_key_file=~/.ssh/id_rsa
+
+[local]
+localhost ansible_connection=local

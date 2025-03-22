@@ -1,0 +1,53 @@
+- name: Instalar y configurar Nginx en la VM usando Podman
+  hosts: vm
+  become: true
+
+  vars:
+    acr_name: "acrgcscp2.azurecr.io"
+    acr_username: "acrgcscp2"
+    nginx_image_name: "{{ acr_name }}/nginx_gcs_cp2"
+    image_version: "Casopractico2"
+    custom_html: "/tmp/index.html"
+
+  vars_files:
+    - secrets.yml
+
+  tasks:
+    - name: Instalar Podman en la VM
+      ansible.builtin.apt:
+        name: podman
+        update_cache: yes
+        state: present
+
+    - name: Iniciar sesión en ACR
+      containers.podman.podman_login:
+        registry: "{{ acr_name }}"
+        username: "{{ acr_username }}"
+        password: "{{ acr_password }}"
+
+    - name: Descargar imagen de Nginx desde ACR
+      containers.podman.podman_image:
+        name: "{{ nginx_image_name }}:{{ image_version }}"
+        pull: yes
+
+    - name: Crear archivo HTML personalizado
+      ansible.builtin.copy:
+        dest: "{{ custom_html }}"
+        content: |
+          <html>
+            <head><title>Resolucion de Caso Practico 2</title></head>
+            <body>
+              <h1>Resolucion de Caso Practico 2</h1>
+            </body>
+          </html>
+
+    - name: Ejecutar el contenedor de Nginx con página personalizada
+      containers.podman.podman_container:
+        name: nginx_web
+        image: "{{ nginx_image_name }}:{{ image_version }}"
+        state: started
+        restart_policy: always
+        ports:
+          - "80:80"
+        volumes:
+          - "{{ custom_html }}:/usr/share/nginx/html/index.html"

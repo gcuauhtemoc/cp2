@@ -1,0 +1,148 @@
+---
+- name: Desplegar contenedores en AKS
+  hosts: localhost
+  gather_facts: no
+  become: false
+
+  vars:
+    aks_name: "aks_gcs_cp2"
+    resource_group: "grupo_gcs_cp2"
+    redis_image: "acrgcscp2.azurecr.io/redis_gcs_cp2:Casopractico2"
+    votes_app_image: "acrgcscp2.azurecr.io/frontapp_gcs_cp2:Casopractico2"
+    kubectl_config: "~/.kube/config"
+    namespace: "gcs-cp2"
+
+  tasks:
+    - name: Crear el namespace gcs_cp2 (si no existe)
+      kubernetes.core.k8s:
+        state: present
+        kind: Namespace
+        name: "{{ namespace }}"
+
+    - name: Crear PersistentVolume para Redis
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: PersistentVolume
+          metadata:
+            name: redis-pv
+            namespace: "{{ namespace }}"
+          spec:
+            capacity:
+              storage: 1Gi
+            accessModes:
+              - ReadWriteOnce
+            hostPath:
+              path: /mnt/data
+
+   
+    - name: Crear PersistentVolumeClaim para Redis
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: PersistentVolumeClaim
+          metadata:
+            name: redis-pvc
+            namespace: "{{ namespace }}"
+          spec:
+            accessModes:
+              - ReadWriteOnce
+            resources:
+              requests:
+                storage: 1Gi
+
+    - name: Crear el Deployment de Redis
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: redis
+            namespace: "{{ namespace }}"
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: redis
+            template:
+              metadata:
+                labels:
+                  app: redis
+              spec:
+                containers:
+                  - name: redis
+                    image: "{{ redis_image }}"
+                    ports:
+                      - containerPort: 6379
+                    env:
+                      - name: ALLOW_EMPTY_PASSWORD
+                        value: "yes"
+                    volumeMounts:
+                      - name: redis-storage
+                        mountPath: /data
+                volumes:
+                  - name: redis-storage
+                    persistentVolumeClaim:
+                      claimName: redis-pvc
+
+    - name: Crear el Service de Redis
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: redis
+            namespace: "{{ namespace }}"
+          spec:
+            selector:
+              app: redis
+            ports:
+              - port: 6379
+
+    - name: Crear el Deployment de la aplicación de votos
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: votes-app-deployment
+            namespace: "{{ namespace }}"
+          spec:
+            replicas: 1
+            selector:
+              matchLabels:
+                app: votes-app
+            template:
+              metadata:
+                labels:
+                  app: votes-app
+              spec:
+                containers:
+                  - name: votes-app
+                    image: "{{ votes_app_image }}"
+                    ports:
+                      - containerPort: 80
+                    env:
+                      - name: REDIS
+                        value: "redis"
+
+    - name: Crear el Service para la aplicación de votos (LoadBalancer)
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: votes-app-service
+            namespace: "{{ namespace }}"
+          spec:
+            selector:
+              app: votes-app
+            ports:
+              - port: 80
+            type: LoadBalancer
